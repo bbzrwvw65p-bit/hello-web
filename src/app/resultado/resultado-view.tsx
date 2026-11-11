@@ -7,6 +7,7 @@ import { getItem } from "@/lib/catalog";
 import { eur, FAMILY_ICON, formatWhen, generationEs, modelTitle, ramLabel, storageLabel } from "@/lib/format";
 import { appleCareLabel, batteryLabel, defectLabel, gradeLabel, marketValue, parseState, priceDataset, stateQuery, type ChannelQuote } from "@/lib/market";
 import { asset } from "@/lib/paths";
+import { DonateButton } from "@/components/donate";
 import { EstimateNote, LifecyclePanel } from "@/components/ui";
 import { resaleIn } from "@/lib/economics";
 import { lifecycle } from "@/lib/lifecycle";
@@ -133,6 +134,7 @@ export function ResultadoView() {
         <Link href={`/modelo?id=${item.id}&ram=${ramValue}&si=${storage ? item.storageOptions.indexOf(storage) : 0}`} className="ios-choice compact">Ver la ficha: vida útil y amortización</Link>
         <Link href="/valorar" className="ios-choice compact">Valorar otro Mac</Link>
       </div>
+      <DonateButton />
     </main>
   );
 }

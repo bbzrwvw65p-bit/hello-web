@@ -4,6 +4,7 @@ import Link from "next/link";
 import { configLabel, SOURCE_LABEL, type Answers, type Result } from "@/lib/advisor";
 import { eur } from "@/lib/format";
 import { INTEL_DISCLAIMER } from "@/lib/lifecycle";
+import { DonateButton } from "./donate";
 import { AltRow, AmortPanel, EstimateNote, Explain, LifecyclePanel, modelHref, OfferHead, offerSpecLine, PriceRows, Traps } from "./ui";
 
 export function AdviceView({ result, answers, onRestart, onBack }: { result: Result; answers: Answers; onRestart: () => void; onBack: () => void }) {
@@ -38,133 +39,146 @@ export function AdviceView({ result, answers, onRestart, onBack }: { result: Res
   }
   const savings = result.savingEUR;
   return (
-    <div className="stack">
-      <div className="card">
-        <OfferHead item={primary.item} kicker={result.needTitle} sub={offerSpecLine(primary)} />
-        <p className="save" style={{ marginTop: 8 }}>{result.needText}</p>
-        <PriceRows channels={primary.channels} best={primary.source} />
-        <p className="save">
-          {savings && savings > 20 ? (
-            <>
-              Te ahorras <span className="tag">≈ {eur(savings)}</span> frente a comprar nuevo algo equivalente.{" "}
-            </>
-          ) : null}
-          Precios orientativos en España.{primary.adaptersEUR ? ` Incluye ≈ ${eur(primary.adaptersEUR)} de adaptadores.` : ""}
-        </p>
-        {primary.softMisses.length ? <p className="save"><b>A tener en cuenta:</b> {primary.softMisses.join(" · ")}.</p> : null}
+    <div className="stack res">
+      {/* Columnas de escritorio. En el móvil, display: contents: el orden y el aspecto no cambian. */}
+      <div className="res-col res-a">
+        <div className="card">
+          <OfferHead item={primary.item} kicker={result.needTitle} sub={offerSpecLine(primary)} />
+          <p className="save" style={{ marginTop: 8 }}>{result.needText}</p>
+          <PriceRows channels={primary.channels} best={primary.source} />
+          <p className="save">
+            {savings && savings > 20 ? (
+              <>
+                Te ahorras <span className="tag">≈ {eur(savings)}</span> frente a comprar nuevo algo equivalente.{" "}
+              </>
+            ) : null}
+            Precios orientativos en España.{primary.adaptersEUR ? ` Incluye ≈ ${eur(primary.adaptersEUR)} de adaptadores.` : ""}
+          </p>
+          {primary.softMisses.length ? <p className="save"><b>A tener en cuenta:</b> {primary.softMisses.join(" · ")}.</p> : null}
+        </div>
+
+        <div className="panels">
+          <LifecyclePanel life={primary.life} />
+          <AmortPanel amort={primary.amort} />
+        </div>
+        <EstimateNote />
       </div>
 
-      <div className="panels">
-        <LifecyclePanel life={primary.life} />
-        <AmortPanel amort={primary.amort} />
-      </div>
-      <EstimateNote />
-      {primary.amort.futureReplacement ? (
+      <div className="res-col res-b">
+        {primary.amort.futureReplacement ? (
+          <p className="note">
+            Cuando toque cambiarlo (≈ {primary.amort.futureYear}), un equivalente nuevo costará ≈ <b>{eur(primary.amort.futureReplacement)}</b>: Apple sube precios casi cada generación (≈ 3 % al año).
+          </p>
+        ) : null}
         <p className="note">
-          Cuando toque cambiarlo (≈ {primary.amort.futureYear}), un equivalente nuevo costará ≈ <b>{eur(primary.amort.futureReplacement)}</b>: Apple sube precios casi cada generación (≈ 3 % al año).
+          Reventa estimada entre particulares: <b>≈ {primary.resale2 != null ? eur(primary.resale2) : "—"}</b> dentro de 2 años y <b>≈ {primary.resale3 != null ? eur(primary.resale3) : "—"}</b> dentro de 3.
         </p>
-      ) : null}
-      <p className="note">
-        Reventa estimada entre particulares: <b>≈ {primary.resale2 != null ? eur(primary.resale2) : "—"}</b> dentro de 2 años y <b>≈ {primary.resale3 != null ? eur(primary.resale3) : "—"}</b> dentro de 3.
-      </p>
 
-      {result.expertFlags.length ? (
-        <div className="panel dashed">
-          <div className="kick white">Lo que pides, frente a tu uso</div>
-          <div className="traps" style={{ marginTop: 8 }}>
-            {result.expertFlags.map((flag) => (
-              <p key={flag} className="trap">{flag}</p>
-            ))}
+        {result.expertFlags.length ? (
+          <div className="panel dashed">
+            <div className="kick white">Lo que pides, frente a tu uso</div>
+            <div className="traps" style={{ marginTop: 8 }}>
+              {result.expertFlags.map((flag) => (
+                <p key={flag} className="trap">{flag}</p>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {result.notNeeded.length ? (
-        <div className="panel dashed">
-          <div className="kick white">Lo que NO necesitas</div>
-          <div className="stack tight" style={{ marginTop: 8 }}>
-            {result.notNeeded.map((entry) => (
-              <p key={entry.text} className="note">
-                {entry.text}
-                {entry.savingEUR ? <> Te ahorras <b>≈ {eur(entry.savingEUR)}</b>.</> : null}
-              </p>
-            ))}
+        {result.notNeeded.length ? (
+          <div className="panel dashed">
+            <div className="kick white">Lo que NO necesitas</div>
+            <div className="stack tight" style={{ marginTop: 8 }}>
+              {result.notNeeded.map((entry) => (
+                <p key={entry.text} className="note">
+                  {entry.text}
+                  {entry.savingEUR ? <> Te ahorras <b>≈ {eur(entry.savingEUR)}</b>.</> : null}
+                </p>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {result.stepUp ? (
-        <div className="panel">
-          <div className="kick">¿Compensa subir un escalón?</div>
-          <p className="note" style={{ marginTop: 6 }}>{result.stepUp.text}</p>
-        </div>
-      ) : null}
-
-      {result.gaming ? (
-        <div className="panel">
-          <div className="kick">Jugar en Mac, sin rodeos</div>
-          <p className="note" style={{ marginTop: 6 }}>{result.gaming}</p>
-        </div>
-      ) : null}
-
-      {result.intelWarning ? (
-        <div className="panel" style={{ borderColor: "var(--y)" }}>
-          <div className="kick" style={{ color: "var(--y)" }}>Ojo: Intel</div>
-          <p className="note" style={{ marginTop: 6 }}>{INTEL_DISCLAIMER}</p>
-        </div>
-      ) : null}
-
-      {primary.traps.length ? (
-        <div>
-          <h3 className="h2">Antes de comprar este</h3>
-          <Traps traps={primary.traps} />
-        </div>
-      ) : null}
-
-      {result.need.notes.length || result.need.reasons.length ? (
-        <div>
-          <h3 className="h2">Por qué esto</h3>
-          <div className="stack tight">
-            {[...result.need.reasons, ...result.need.notes].map((text) => (
-              <p key={text} className="note">{text}</p>
-            ))}
+        {result.stepUp ? (
+          <div className="panel">
+            <div className="kick">¿Compensa subir un escalón?</div>
+            <p className="note" style={{ marginTop: 6 }}>{result.stepUp.text}</p>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {result.alternatives.length ? (
-        <div>
-          <h3 className="h2">Otras opciones</h3>
-          {result.alternatives.map((alt) => (
-            <AltRow key={alt.label} label={alt.label} offer={alt.offer} href={modelHref(alt.offer.item, alt.offer.ramGB, alt.offer.storageIndex)} />
-          ))}
-        </div>
-      ) : null}
+        {result.gaming ? (
+          <div className="panel">
+            <div className="kick">Jugar en Mac, sin rodeos</div>
+            <p className="note" style={{ marginTop: 6 }}>{result.gaming}</p>
+          </div>
+        ) : null}
 
-      <div>
-        <h3 className="h2">Qué significa cada cosa</h3>
-        <Explain term="ram" uses={uses} open={answers.mode === "novato"} label={`Memoria: ${configLabel(primary).split(" · ")[0]}`} />
-        <Explain term="ssd" uses={uses} label={`Almacenamiento: ${configLabel(primary).split(" · ")[1]}`} />
-        <Explain term="chip" uses={uses} label={`Chip: ${primary.item.chip}`} />
-        <Explain term="semaforo" />
-        <Explain term="amortizacion" />
-        <Explain term="precio" />
-        {primary.source === "particular" ? <Explain term="particular" /> : null}
+        {result.intelWarning ? (
+          <div className="panel" style={{ borderColor: "var(--y)" }}>
+            <div className="kick" style={{ color: "var(--y)" }}>Ojo: Intel</div>
+            <p className="note" style={{ marginTop: 6 }}>{INTEL_DISCLAIMER}</p>
+          </div>
+        ) : null}
+
+        {primary.traps.length ? (
+          <div>
+            <h3 className="h2">Antes de comprar este</h3>
+            <Traps traps={primary.traps} />
+          </div>
+        ) : null}
+
+        {result.need.notes.length || result.need.reasons.length ? (
+          <div>
+            <h3 className="h2">Por qué esto</h3>
+            <div className="stack tight">
+              {[...result.need.reasons, ...result.need.notes].map((text) => (
+                <p key={text} className="note">{text}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
       </div>
 
-      <div className="linklist">
-        <Link href={modelHref(primary.item, primary.ramGB, primary.storageIndex)}>
-          Ver la ficha completa <span className="mono">FICHA →</span>
-        </Link>
-        <Link href={`/comparar?ids=${[primary.item.id, ...result.alternatives.slice(0, 2).map((alt) => alt.offer.item.id)].join(",")}`}>
-          Comparar con las otras opciones <span className="mono">LADO A LADO →</span>
-        </Link>
-        <Link href="/checklist">
-          Comprar usado sin sustos <span className="mono">CHECKLIST →</span>
-        </Link>
-        <button type="button" onClick={onRestart}>
-          Empezar de nuevo <span className="mono">↺</span>
-        </button>
+      <div className="res-col res-c">
+        {result.alternatives.length ? (
+          <div>
+            <h3 className="h2">Otras opciones</h3>
+            {result.alternatives.map((alt) => (
+              <AltRow key={alt.label} label={alt.label} offer={alt.offer} href={modelHref(alt.offer.item, alt.offer.ramGB, alt.offer.storageIndex)} />
+            ))}
+          </div>
+        ) : null}
+
+      </div>
+
+      <div className="res-foot">
+        <div className="gloss">
+          <h3 className="h2">Qué significa cada cosa</h3>
+          <Explain term="ram" uses={uses} open={answers.mode === "novato"} label={`Memoria: ${configLabel(primary).split(" · ")[0]}`} />
+          <Explain term="ssd" uses={uses} label={`Almacenamiento: ${configLabel(primary).split(" · ")[1]}`} />
+          <Explain term="chip" uses={uses} label={`Chip: ${primary.item.chip}`} />
+          <Explain term="semaforo" />
+          <Explain term="amortizacion" />
+          <Explain term="precio" />
+          {primary.source === "particular" ? <Explain term="particular" /> : null}
+        </div>
+
+        <div className="linklist">
+          <Link href={modelHref(primary.item, primary.ramGB, primary.storageIndex)}>
+            Ver la ficha completa <span className="mono">FICHA →</span>
+          </Link>
+          <Link href={`/comparar?ids=${[primary.item.id, ...result.alternatives.slice(0, 2).map((alt) => alt.offer.item.id)].join(",")}`}>
+            Comparar con las otras opciones <span className="mono">LADO A LADO →</span>
+          </Link>
+          <Link href="/checklist">
+            Comprar usado sin sustos <span className="mono">CHECKLIST →</span>
+          </Link>
+          <button type="button" onClick={onRestart}>
+            Empezar de nuevo <span className="mono">↺</span>
+          </button>
+        </div>
+        <DonateButton style={{ marginTop: 4 }} />
       </div>
     </div>
   );

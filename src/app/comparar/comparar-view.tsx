@@ -71,7 +71,7 @@ export function CompararView() {
     : [];
 
   return (
-    <main className="screen">
+    <main className="screen wide compare">
       <div className="kick">Comparador · hasta 3 Mac</div>
       <h1 className="question">Lado a lado, y qué significa cada cosa</h1>
       <p className="legend">Explícamelo para:</p>
@@ -96,6 +96,7 @@ export function CompararView() {
                   <button type="button" className="chip" style={{ fontSize: 11, padding: "2px 6px" }} onClick={() => setSlots(slots.filter((_, i) => i !== index))}>Quitar</button>
                 </th>
               ))}
+              <th className="why-h desk-only"><span className="kick">Qué significa para ti</span></th>
             </tr>
           </thead>
           <tbody>
@@ -104,13 +105,18 @@ export function CompararView() {
               return [
                 <tr key={row.term + "-h"} className="rowhead">
                   <td colSpan={data.length}><span className="kick">{row.label}</span></td>
+                  <td className="desk-only" />
                 </tr>,
                 <tr key={row.term}>
                   {row.cells.map((cell, index) => (
                     <td key={index} className={row.best === index ? "win" : ""}>{cell}</td>
                   ))}
+                  <td className="why-side desk-only">
+                    {entry.text}
+                    {entry.forYou ? <> <b>Para ti:</b> {entry.forYou}</> : null}
+                  </td>
                 </tr>,
-                <tr key={row.term + "-w"}>
+                <tr key={row.term + "-w"} className="mob-only">
                   <td colSpan={data.length} className="why">
                     {entry.text}
                     {entry.forYou ? <> <b>Para ti:</b> {entry.forYou}</> : null}

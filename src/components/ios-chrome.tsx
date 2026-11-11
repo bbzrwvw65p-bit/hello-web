@@ -24,6 +24,25 @@ const menu = [
   { href: "/acerca", label: "Acerca de hello." },
 ];
 
+const more = [
+  { href: "/checklist", label: "Comprar usado sin sustos" },
+  { href: "/acerca", label: "Acerca de hello." },
+];
+
+/** Subtítulo de la cabecera de escritorio. */
+function kickerFor(path: string): string {
+  if (path.startsWith("/valorar")) return "Tasación · precios en €";
+  if (path.startsWith("/recomendar")) return "3 modos · sin tiendas";
+  if (path.startsWith("/resultado")) return "Lo que te darían por tu Mac";
+  if (path.startsWith("/catalogo")) return "Desde 2006 hasta hoy";
+  if (path.startsWith("/modelo")) return "Vida útil · amortización · reventa";
+  if (path.startsWith("/comparar")) return "Hasta 3 Mac · lado a lado";
+  if (path.startsWith("/mi-mac")) return "Tu Mac, frente a lo que haces";
+  if (path.startsWith("/checklist")) return "Antes de pagar";
+  if (path.startsWith("/acerca")) return "hello.";
+  return "";
+}
+
 function clean(path: string): string {
   return path.replace(/\/$/, "") || "/";
 }
@@ -79,15 +98,33 @@ export function IosChrome({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+      {title ? (
+        <div className="desk-title" aria-hidden>
+          <span className="t">{title}</span>
+          <span className="kick">{kickerFor(path)}</span>
+        </div>
+      ) : null}
+
       {children}
 
       <nav className="ios-tabs" aria-label="Secciones">
+        <Link href="/" className="side-brand" aria-label="Inicio">
+          hello<span className="dot" />
+        </Link>
         {tabs.map((tab) => (
           <Link key={tab.href} href={tab.href} className={path.startsWith(tab.href) ? "active" : ""}>
             <img src={asset(tab.icon)} alt="" width={26} height={26} />
             {tab.label}
           </Link>
         ))}
+        <div className="side-foot">
+          <div className="kick">Más</div>
+          {more.map((item) => (
+            <Link key={item.href} href={item.href} className={path.startsWith(item.href) ? "on" : ""}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
       </nav>
     </div>
   );

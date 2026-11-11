@@ -49,47 +49,62 @@ export function ModeloView() {
       : []),
   ];
   return (
-    <main className="screen">
-      <div className="card">
+    <main className="screen wide sheet">
+      {/* Escritorio: tarjeta y tres paneles arriba; debajo, dos columnas. En el móvil las cajas son display: contents. */}
+      <div className="card sh-card">
         <OfferHead item={item} kicker={`Ficha · ${generationEs(item.generation)}`} sub={`${ram} GB RAM · ${storage?.label ?? ""}`.toUpperCase()} />
         <PriceRows channels={ch} best={best} />
         <p className="save">Precios orientativos para esta configuración en España.{item.launchPriceEUR ? <> Salió a <b>{eur(item.launchPriceEUR)}</b>.</> : null}</p>
       </div>
-      <div style={{ marginTop: 12 }}>
+      <div className="sh-config" style={{ marginTop: 12 }}>
         <ConfigPicker item={item} ram={ram} storageIndex={si} onChange={(nextRam, nextSi) => { setRam(nextRam); setSi(nextSi); }} />
       </div>
-      <div className="panels" style={{ marginTop: 12 }}>
+      <div className="panels sh-panels" style={{ marginTop: 12 }}>
         <LifecyclePanel life={life} />
         {amort ? <AmortPanel amort={amort} /> : <div className="panel"><div className="kick">Amortización</div><p className="note">Sin precio contrastado.</p></div>}
+        <div className="panel desk-only">
+          <div className="kick">Reventa</div>
+          <div className="big-num">{r2 != null ? <>≈{eur(r2)}</> : "—"}</div>
+          <p className="note">si lo vendes en 2 años a un particular</p>
+          <dl className="kv">
+            <dt>En 3 años</dt>
+            <dd>{r3 != null ? `≈ ${eur(r3)}` : "—"}</dd>
+          </dl>
+          <p className="est">Estimación: pierde ≈ 14–16 % al año, más si se acerca el fin del soporte.</p>
+        </div>
       </div>
-      <p className="note" style={{ marginTop: 10 }}>{life.summary}</p>
-      <EstimateNote />
-      <p className="note" style={{ marginTop: 10 }}>
-        Reventa estimada entre particulares: <b>≈ {r2 != null ? eur(r2) : "—"}</b> en 2 años y <b>≈ {r3 != null ? eur(r3) : "—"}</b> en 3.
-      </p>
-      {!life.appleSilicon ? (
-        <div className="panel" style={{ marginTop: 12, borderColor: "var(--y)" }}>
-          <div className="kick" style={{ color: "var(--y)" }}>Ojo: Intel</div>
-          <p className="note" style={{ marginTop: 6 }}>{INTEL_DISCLAIMER}</p>
-        </div>
-      ) : null}
-      <h3 className="h2">Antes de comprarlo</h3>
-      <Traps traps={trapsFor(item, ram, storage)} />
-      <h3 className="h2">Qué significa cada cosa</h3>
-      {rows.map((row) => (
-        <div key={row.label}>
-          <div className="between" style={{ paddingTop: 8 }}>
-            <span className="kick">{row.label}</span>
-            <span className="mono" style={{ fontSize: 12, fontWeight: 600, textAlign: "right" }}>{row.value}</span>
+      <div className="sh-left">
+        <p className="note" style={{ marginTop: 10 }}>{life.summary}</p>
+        <EstimateNote />
+        <p className="note mob-only" style={{ marginTop: 10 }}>
+          Reventa estimada entre particulares: <b>≈ {r2 != null ? eur(r2) : "—"}</b> en 2 años y <b>≈ {r3 != null ? eur(r3) : "—"}</b> en 3.
+        </p>
+        {!life.appleSilicon ? (
+          <div className="panel" style={{ marginTop: 12, borderColor: "var(--y)" }}>
+            <div className="kick" style={{ color: "var(--y)" }}>Ojo: Intel</div>
+            <p className="note" style={{ marginTop: 6 }}>{INTEL_DISCLAIMER}</p>
           </div>
-          <Explain term={row.term} label=" " />
+        ) : null}
+        <h3 className="h2">Antes de comprarlo</h3>
+        <Traps traps={trapsFor(item, ram, storage)} />
+      </div>
+      <div className="sh-right">
+        <h3 className="h2">Qué significa cada cosa</h3>
+        {rows.map((row) => (
+          <div key={row.label}>
+            <div className="between" style={{ paddingTop: 8 }}>
+              <span className="kick">{row.label}</span>
+              <span className="mono" style={{ fontSize: 12, fontWeight: 600, textAlign: "right" }}>{row.value}</span>
+            </div>
+            <Explain term={row.term} label=" " />
+          </div>
+        ))}
+        <Explain term="intelligence" label={`Apple Intelligence: ${life.appleIntelligence ? "sí" : "no"}`} />
+        <div className="linklist" style={{ marginTop: 14 }}>
+          <Link href={`/valorar?id=${item.id}&ram=${ram}&si=${si}`}>Tasar este Mac <span className="mono">TASAR →</span></Link>
+          <Link href={`/comparar?ids=${item.id}`}>Compararlo con otros <span className="mono">COMPARAR →</span></Link>
+          <Link href="/checklist">Comprar usado sin sustos <span className="mono">CHECKLIST →</span></Link>
         </div>
-      ))}
-      <Explain term="intelligence" label={`Apple Intelligence: ${life.appleIntelligence ? "sí" : "no"}`} />
-      <div className="linklist" style={{ marginTop: 14 }}>
-        <Link href={`/valorar?id=${item.id}&ram=${ram}&si=${si}`}>Tasar este Mac <span className="mono">TASAR →</span></Link>
-        <Link href={`/comparar?ids=${item.id}`}>Compararlo con otros <span className="mono">COMPARAR →</span></Link>
-        <Link href="/checklist">Comprar usado sin sustos <span className="mono">CHECKLIST →</span></Link>
       </div>
     </main>
   );

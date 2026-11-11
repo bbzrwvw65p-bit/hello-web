@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DonateSection } from "@/components/donate";
+import { HonestAi } from "@/components/honest-ai";
 import { asset } from "@/lib/paths";
 
 export const metadata = { title: "Acerca de" };
@@ -39,6 +41,11 @@ export default function AcercaPage() {
           El coste por año es lo que pagas menos lo que recuperarás al venderlo, repartido entre los años con soporte que le quedan, más un pequeño coste por las novedades de macOS que ya no le llegarán. Para el siguiente Mac se cuenta con que Apple suba precios, ≈ 3 % al año.
         </p>
 
+        <h2>IA, sí; magia, no</h2>
+        <p>
+          La web se ha diseñado y programado con ayuda de IA. Lo que no hace una IA son las cuentas: la tasación, la vida útil y el coste por año salen de fórmulas fijas que puedes leer arriba, y de precios reales que se descargan cada mañana. Lo que es una estimación va marcado con ≈.
+        </p>
+
         <h2>Qué no inventa</h2>
         <p>
           Si un modelo es real pero su precio español no quedó contrastado, el catálogo lo lista y la tasación se niega a poner una cifra. Las cifras de segunda mano son orientativas y en rangos.
@@ -49,7 +56,9 @@ export default function AcercaPage() {
           En Safari, Compartir y luego «Añadir a pantalla de inicio». Se abre a pantalla completa, como una app.
         </p>
       </div>
-      <div className="linklist">
+      <HonestAi />
+      <DonateSection />
+      <div className="linklist" style={{ marginTop: 22 }}>
         <Link href="/checklist">Comprar usado sin sustos <span className="mono">CHECKLIST →</span></Link>
       </div>
     </main>

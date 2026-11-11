@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { DonateButton } from "@/components/donate";
+import { MacDetect } from "@/components/mac-detect";
 import { ConfigPicker, ModelPicker } from "@/components/model-picker";
 import { Explain, LifecyclePanel, modelHref, OfferHead, Traps } from "@/components/ui";
 import { eur } from "@/lib/format";
@@ -19,15 +21,25 @@ export default function MiMacPage() {
   const [si, setSi] = useState(0);
   const [uses, setUses] = useState<Use[]>([]);
   const [done, setDone] = useState(false);
+  const [detectShown, setDetectShown] = useState(false);
+  const [manual, setManual] = useState(false);
+  const onDetectReady = useCallback((shown: boolean) => setDetectShown(shown), []);
+  const pickItem = (picked: CatalogItem) => { setItem(picked); setRam(picked.ramGB); setSi(0); };
   const verdict = useMemo(() => (item && done ? changeOrWait(item, ram, si, uses) : null), [item, ram, si, uses, done]);
 
   if (!item) {
+    const detecting = !manual && detectShown;
     return (
-      <main className="screen">
+      <main className={detecting ? "screen wide" : "screen"}>
         <div className="kick">01 / 03 · Tu Mac</div>
-        <h1 className="question">¿Qué Mac tienes ahora?</h1>
-        <p className="sub">Lo ves en el menú Apple → Acerca de este Mac.</p>
-        <ModelPicker onPick={(picked) => { setItem(picked); setRam(picked.ramGB); setSi(0); }} />
+        {!manual ? <MacDetect onPick={pickItem} onDismiss={() => setManual(true)} onReady={onDetectReady} /> : null}
+        {detecting ? null : (
+          <>
+            <h1 className="question">¿Qué Mac tienes ahora?</h1>
+            <p className="sub">Lo ves en el menú Apple → Acerca de este Mac.</p>
+            <ModelPicker onPick={pickItem} />
+          </>
+        )}
       </main>
     );
   }
@@ -101,6 +113,7 @@ export default function MiMacPage() {
         <Link href={modelHref(item, ram, si)}>Ficha de mi Mac <span className="mono">FICHA →</span></Link>
         <button type="button" onClick={() => { setDone(false); setItem(null); setUses([]); }}>Probar con otro <span className="mono">↺</span></button>
       </div>
+      <DonateButton />
     </main>
   );
 }

@@ -1,9 +1,12 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+// Lee CUSTOM_DOMAIN de src/config/site.ts: con dominio propio, la base es la raíz.
+const site = readFileSync(join(root, "src", "config", "site.ts"), "utf8");
+const customDomain = (site.match(/export const CUSTOM_DOMAIN\s*=\s*"([^"]*)"/)?.[1] ?? "").trim();
+const base = customDomain ? "" : (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const shell = ["/", "/recomendar/", "/valorar/", "/mi-mac/", "/comparar/", "/catalogo/", "/modelo/", "/checklist/", "/acerca/"].map((path) => `${base}${path}`);
 
 const source = `const CACHE = "hello-shell-v3";
@@ -46,3 +49,7 @@ self.addEventListener("fetch", (event) => {
 
 writeFileSync(join(root, "public", "sw.js"), source);
 console.log(`sw.js con base «${base || "/"}»`);
+if (customDomain) {
+  writeFileSync(join(root, "public", "CNAME"), `${customDomain}\n`);
+  console.log(`CNAME: ${customDomain}`);
+}

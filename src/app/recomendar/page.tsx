@@ -163,7 +163,7 @@ export default function RecomendarPage() {
   };
 
   return (
-    <main className="screen">
+    <main className={step === "result" ? "screen wide" : "screen"}>
       {step !== "result" ? (
         <>
           <div className="prog" aria-hidden>
