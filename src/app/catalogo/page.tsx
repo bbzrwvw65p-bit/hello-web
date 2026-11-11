@@ -5,7 +5,15 @@ import Link from "next/link";
 import { getCatalog } from "@/lib/catalog";
 import { eur, generationEs, modelTitle, ramLabel } from "@/lib/format";
 import { asset } from "@/lib/paths";
-import type { FamilyId } from "@/lib/types";
+import { lifecycle } from "@/lib/lifecycle";
+import type { CatalogItem, FamilyId } from "@/lib/types";
+
+const COLORS = { verde: "var(--g)", amarillo: "var(--y)", rojo: "var(--r)" } as const;
+
+function LightDot({ item }: { item: CatalogItem }) {
+  const light = lifecycle(item).light;
+  return <span aria-label={`Soporte ${light}`} style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: COLORS[light], marginLeft: 2 }} />;
+}
 
 const catalog = getCatalog();
 const filters: { id: FamilyId | "todos"; label: string }[] = [
@@ -49,8 +57,9 @@ export default function CatalogoPage() {
 
   return (
     <main className="screen">
+      <div className="kick">Desde 2006 hasta hoy</div>
       <h1 className="question">Catálogo</h1>
-      <p className="note">{catalog.length} configuraciones. Toca una para tasarla.</p>
+      <p className="note">{catalog.length} configuraciones. Toca uno para ver su ficha: vida útil, precios y qué significa cada cosa.</p>
       <input className="field" value={query} onChange={(event) => { setQuery(event.target.value); setShown(24); }} placeholder="Busca M4, 2015, Mac mini…" style={{ marginTop: 12 }} />
       <div className="chip-row" style={{ margin: "12px 0", justifyContent: "flex-start" }}>
         {filters.map((filter) => (
@@ -63,11 +72,12 @@ export default function CatalogoPage() {
         <p className="note">Ningún Mac coincide con esa búsqueda.</p>
       ) : (
         visible.map((item) => (
-          <Link key={item.id} href={`/resultado?id=${item.id}&ram=${item.ramGB}&si=0`} className="list-row">
+          <Link key={item.id} href={`/modelo?id=${item.id}`} className="list-row">
             <img src={asset(icon[item.family])} alt="" />
             <span>
               <strong>{modelTitle(item)}</strong>
               {item.availability === "current" ? " · Actual" : item.availability === "preorder" ? " · Preventa" : ""}
+              {" "}<LightDot item={item} />
               <br />
               <span className="note">
                 {generationEs(item.generation)} · {item.cpu}

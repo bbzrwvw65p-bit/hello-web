@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "hello.", template: "%s · hello." },
-  description: "Valora tu Mac y deja que hello. te recomiende el siguiente. Precios en euros, España.",
+  description: "El Mac que de verdad necesitas, casi siempre de segunda mano. Recomendador, tasación, vida útil y comparador. Precios en euros, España.",
   applicationName: "hello.",
   appleWebApp: { capable: true, title: "hello.", statusBarStyle: "black" },
   icons: {
@@ -24,10 +24,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const theme = {
-    "--hello-dark": `url("${asset("/hello/darkbackground.png")}")`,
-    "--hello-wood": `url("${asset("/hello/fondomadera.png")}")`,
-  } as CSSProperties;
+  const theme = {} as CSSProperties;
   return (
     <html lang="es">
       <body style={theme}>

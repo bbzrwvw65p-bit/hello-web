@@ -1,16 +1,34 @@
 import observationsFile from "@/data/market/observations.json";
+import { getCatalog } from "./catalog";
+import { eur } from "./format";
 import { ageYears } from "./depreciation";
 import type { CatalogItem, StorageOption } from "./types";
 
 export type Grade = "como-nuevo" | "muy-bueno" | "bueno" | "aceptable";
-export type Defect = "pantalla" | "teclado" | "liquido" | "placa" | "golpes";
+export type Defect = "golpes" | "marcas" | "pantalla" | "teclado" | "puertos" | "liquido" | "placa" | "bloqueo";
+
+export const DEFECTS: { id: Defect; label: string; portableOnly?: boolean }[] = [
+  { id: "golpes", label: "Golpes o abolladuras" },
+  { id: "marcas", label: "Marcas en la pantalla" },
+  { id: "pantalla", label: "Pantalla rota o con líneas" },
+  { id: "teclado", label: "Teclas o trackpad que fallan", portableOnly: true },
+  { id: "puertos", label: "Puerto, altavoz o cámara que falla" },
+  { id: "liquido", label: "Se mojó" },
+  { id: "placa", label: "No enciende o falla la placa" },
+  { id: "bloqueo", label: "Bloqueo de iCloud o de empresa (MDM)" },
+];
 
 export type MachineState = {
   grade: Grade;
   batteryHealth: number | null;
   cycleCount: number | null;
   appleCareMonths: number;
+  /** Caja original. */
   boxAndCharger: boolean;
+  /** Cargador original en un portátil; teclado y ratón o trackpad en un iMac. */
+  charger: boolean;
+  /** Factura de compra a nombre del vendedor. */
+  invoice: boolean;
   keyboard: "es" | "other" | "na";
   nanoTexture: boolean;
   defects: Defect[];
@@ -100,12 +118,27 @@ const GRADE_FACTOR: Record<Grade, number> = {
 };
 
 const DEFECT_FACTOR: Record<Defect, number> = {
-  pantalla: 0.75,
-  teclado: 0.82,
-  liquido: 0.55,
-  placa: 0.6,
   golpes: 0.93,
+  marcas: 0.88,
+  pantalla: 0.6,
+  teclado: 0.85,
+  puertos: 0.9,
+  liquido: 0.55,
+  placa: 0.35,
+  bloqueo: 0.25,
 };
+
+export function defectLabel(defect: Defect): string {
+  return DEFECTS.find((entry) => entry.id === defect)?.label ?? defect;
+}
+
+export function batteryLabel(health: number | null): string {
+  if (health == null) return "Batería sin comprobar";
+  if (health >= 90) return "Batería 90% o más";
+  if (health >= 85) return "Batería 85–89%";
+  if (health >= 80) return "Batería 80–84%";
+  return "Batería por debajo del 80%";
+}
 
 export function gradeLabel(grade: Grade): string {
   return { "como-nuevo": "Como nuevo", "muy-bueno": "Muy bueno", bueno: "Bueno", aceptable: "Aceptable" }[grade];
@@ -113,8 +146,8 @@ export function gradeLabel(grade: Grade): string {
 
 export function appleCareLabel(months: number): string {
   if (months <= 0) return "Sin AppleCare";
-  if (months < 12) return "AppleCare este año";
-  return "AppleCare más de un año";
+  if (months < 12) return "Garantía < 1 año";
+  return "Garantía > 1 año";
 }
 
 export const DEFAULT_STATE: MachineState = {
@@ -123,6 +156,8 @@ export const DEFAULT_STATE: MachineState = {
   cycleCount: null,
   appleCareMonths: 0,
   boxAndCharger: true,
+  charger: true,
+  invoice: true,
   keyboard: "es",
   nanoTexture: false,
   defects: [],
@@ -134,13 +169,22 @@ export function nanoAvailable(item: CatalogItem): boolean {
 }
 
 export function supportLevel(item: CatalogItem): "full" | "security" | "none" {
-  const chip = item.chip.toLowerCase();
-  if (/^m\d/.test(chip) || chip.includes("a18")) return "full";
+  if (isAppleSilicon(item)) return "full";
   if (item.family === "macbook-pro" && item.screenInches >= 16 && item.year === 2019) return "security";
   if (item.id === "mbp-13-2020-4ports") return "security";
   if (item.family === "imac" && item.screenInches >= 27 && item.year === 2020) return "security";
   if (item.family === "mac-pro" && item.year === 2019 && /xeon/i.test(item.chip)) return "security";
   return "none";
+}
+
+/**
+ * Apple silicon de verdad. En los CSV de 2019 el Core m3/m5/m7 de Intel y algunos
+ * iMac y MacBook Pro de 2015 llevan "M3" o "m5" en el campo chip: sin el año, la app
+ * los tomaba por un M3 o un M5 con soporte completo y los tasaba muy por encima.
+ */
+export function isAppleSilicon(item: CatalogItem): boolean {
+  if (item.year < 2020) return false;
+  return /^M\d/.test(item.chip.trim()) || /a1\d/i.test(item.chip);
 }
 
 export function hasButterflyKeyboard(item: CatalogItem): boolean {
@@ -160,9 +204,13 @@ export function refurbishedRetention(item: CatalogItem, age: number): number {
   const support = supportLevel(item);
   const pro = isProSegment(item);
   const kEarly = support === "full" ? (pro ? 0.07 : 0.035) : support === "security" ? 0.08 : 0.09;
-  const kLate = support === "full" ? (pro ? 0.1 : 0.08) : 0.12;
+  const kLate = support === "full" ? (pro ? 0.1 : 0.08) : 0.2;
   const early = Math.exp(-kEarly * Math.min(age, 3));
-  const late = Math.exp(-kLate * Math.max(0, age - 3));
+  // Fuera de soporte el valor cae rápido hasta los 8 años y luego se aplana: un Mac
+  // que enciende siempre tiene comprador por piezas, pantalla o batería.
+  const late = support === "full"
+    ? Math.exp(-kLate * Math.max(0, age - 3))
+    : Math.exp(-kLate * Math.min(5, Math.max(0, age - 3))) * Math.exp(-0.05 * Math.max(0, age - 8));
   let factor = early * late;
   if (support === "security") factor *= 0.75;
   if (support === "none") factor *= 0.62;
@@ -184,6 +232,66 @@ function specFactor(item: CatalogItem, ramGB: number, storage: StorageOption): n
   return Math.min(2.6, Math.max(0.55, factor));
 }
 
+type Tier = "base" | "pro" | "max" | "ultra";
+
+function tierOf(item: CatalogItem): Tier {
+  const chip = item.chip.toLowerCase();
+  if (chip.includes("ultra")) return "ultra";
+  if (chip.includes("max")) return "max";
+  if (chip.includes("pro") && !chip.includes("a18")) return "pro";
+  return "base";
+}
+
+function chipGeneration(item: CatalogItem): number | null {
+  const match = item.chip.match(/^M(\d+)/);
+  return match && isAppleSilicon(item) ? Number(match[1]) : null;
+}
+
+/** Lo que se paga por un Mac usado frente al nuevo que lo sustituye hoy, por generaciones de chip. */
+const SUCCESSOR_SHARE = [1, 0.88, 0.8, 0.74, 0.66, 0.6, 0.55];
+
+function sameLine(a: CatalogItem, b: CatalogItem): boolean {
+  return a.family === b.family && tierOf(a) === tierOf(b) && screensClose(a.screenInches, b.screenInches);
+}
+
+/**
+ * Techo por sucesor. Apple bajó mucho los precios de salida (el Air M2 salió a 1.519 €,
+ * el M5 a 1.199 € con el doble de memoria), así que anclar un Mac de 2022 a su precio de
+ * lanzamiento lo sobrevaloraba. Un usado no se paga más que una parte del nuevo que lo
+ * sustituye hoy en la tienda, ajustada por memoria y disco.
+ */
+export function successorCap(item: CatalogItem, ramGB: number, storage: StorageOption): { cap: number; successor: CatalogItem; generations: number } | null {
+  const generation = chipGeneration(item);
+  if (generation == null || item.availability !== "discontinued") return null;
+  const successors = getCatalog().filter(
+    (entry) => entry.availability === "current" && entry.launchPriceEUR != null && sameLine(entry, item) && (chipGeneration(entry) ?? 0) > generation,
+  );
+  if (!successors.length) return null;
+  const successor = successors.sort((a, b) => (a.launchPriceEUR ?? 0) - (b.launchPriceEUR ?? 0))[0];
+  const generations = (chipGeneration(successor) ?? generation) - generation;
+  const share = SUCCESSOR_SHARE[Math.min(generations, SUCCESSOR_SHARE.length - 1)];
+  let spec = 1;
+  if (successor.ramGB > 0 && ramGB > 0) spec *= (ramGB / successor.ramGB) ** RAM_ELASTICITY;
+  if (successor.storageGB && storage.gb) spec *= (storage.gb / successor.storageGB) ** STORAGE_ELASTICITY;
+  spec = Math.min(2.6, Math.max(0.45, spec));
+  return { cap: (successor.launchPriceEUR as number) * share * spec, successor, generations };
+}
+
+/**
+ * Para los modelos reales sin PVP español contrastado (MacBook Pro Max, M3 Pro, Mac Studio
+ * de 2025, iMac M3) se toma el PVP más bajo de un hermano de la misma línea a tres años
+ * o menos. La confianza baja y la ficha lo dice.
+ */
+export function siblingLaunch(item: CatalogItem): { price: number; sibling: CatalogItem } | null {
+  if (!isAppleSilicon(item)) return null;
+  const siblings = getCatalog().filter(
+    (entry) => entry.id !== item.id && entry.launchPriceEUR != null && sameLine(entry, item) && Math.abs(entry.year - item.year) <= 3 && isAppleSilicon(entry),
+  );
+  if (!siblings.length) return null;
+  const sibling = siblings.sort((a, b) => (a.launchPriceEUR ?? 0) - (b.launchPriceEUR ?? 0))[0];
+  return { price: sibling.launchPriceEUR as number, sibling };
+}
+
 function appleNewPrice(item: CatalogItem, ramGB: number, storage: StorageOption): number | null {
   const base = item.launchPriceEUR ?? (item.priceBasis === "launch" ? item.basePriceEUR : null);
   if (base == null) return null;
@@ -194,40 +302,58 @@ function appleNewPrice(item: CatalogItem, ramGB: number, storage: StorageOption)
 function conditionFactor(item: CatalogItem, state: MachineState): { factor: number; notes: string[] } {
   const notes: string[] = [];
   let factor = GRADE_FACTOR[state.grade];
-  if (item.formFactor === "portable" && state.batteryHealth != null) {
+  if (item.formFactor === "portable") {
     const health = state.batteryHealth;
-    const battery = health >= 90 ? 1 : health >= 85 ? 0.97 : health >= 80 ? 0.94 : health >= 70 ? 0.88 : 0.8;
-    factor *= battery;
-    if (battery < 1) notes.push(`La batería al ${health}% resta valor: el servicio de Apple empieza en el 80%.`);
+    if (health == null) {
+      factor *= 0.97;
+      notes.push("Sin el dato de la batería, quien compra descuenta algo. Míralo en Ajustes del Sistema > Batería.");
+    } else {
+      const battery = health >= 90 ? 1 : health >= 85 ? 0.97 : health >= 80 ? 0.94 : 0.86;
+      factor *= battery;
+      if (health < 80) notes.push("Batería por debajo del 80%: macOS pide servicio y quien compra resta lo que cuesta cambiarla.");
+      else if (battery < 1) notes.push(`${batteryLabel(health)}: resta un poco.`);
+    }
     if (state.cycleCount != null && state.cycleCount > 400) {
       const hit = Math.min(0.08, ((state.cycleCount - 400) / 200) * 0.02);
       factor *= 1 - hit;
-      notes.push(`${state.cycleCount} ciclos de batería.`);
+      notes.push(state.cycleCount > 600 ? "Más de 600 ciclos de batería: resta algo más." : "Entre 300 y 600 ciclos de batería.");
     }
   }
   if (state.appleCareMonths > 0) {
     factor *= Math.min(1.04, 1 + state.appleCareMonths * 0.0015);
-    notes.push(`AppleCare con ${state.appleCareMonths} meses por delante.`);
+    notes.push(state.appleCareMonths >= 12 ? "Más de un año de garantía o AppleCare+: suma un poco." : "Le queda garantía o AppleCare+ unos meses: suma poco.");
+  }
+  const accessory = item.formFactor === "portable" ? "cargador" : item.family === "imac" ? "teclado y ratón" : null;
+  if (accessory && !state.charger) {
+    factor *= item.formFactor === "portable" ? 0.95 : 0.94;
+    notes.push(item.formFactor === "portable" ? "Sin el cargador original: un cargador de Apple nuevo cuesta 60–90 €." : "Sin el teclado y el ratón originales del iMac.");
   }
   if (!state.boxAndCharger) {
-    factor *= item.formFactor === "portable" ? 0.97 : 0.98;
-    notes.push("Sin caja o sin cargador original.");
+    factor *= 0.98;
+    notes.push("Sin la caja original.");
+  }
+  if (!state.invoice) {
+    factor *= 0.95;
+    notes.push("Sin factura: los compradores y las tiendas la piden para descartar que sea robado.");
   }
   if (item.formFactor === "portable" && state.keyboard === "other") {
-    factor *= 0.96;
-    notes.push("Teclado que no es español: en este mercado se vende un poco peor.");
+    factor *= 0.94;
+    notes.push("Teclado sin ñ (inglés u otro idioma): en España se vende peor.");
   }
   if (state.nanoTexture && nanoAvailable(item)) {
     factor *= 1.03;
     notes.push("Vidrio nanotexturizado: Apple lo cobraba aparte; el mercado conserva una parte pequeña.");
   }
-  for (const defect of state.defects) factor *= DEFECT_FACTOR[defect];
-  if (state.defects.length) notes.push(`Defectos declarados: ${state.defects.join(", ")}.`);
+  const defects = state.defects.filter((defect) => item.formFactor === "portable" || defect !== "teclado");
+  for (const defect of defects) factor *= DEFECT_FACTOR[defect];
+  if (defects.includes("bloqueo")) notes.push("Con bloqueo de activación o MDM solo se vende para piezas. Quítalo antes de vender si puedes.");
+  else if (defects.includes("placa") || defects.includes("liquido")) notes.push("Con daño de placa o de líquido el precio es casi de piezas: pide presupuesto de reparación antes de vender.");
+  if (defects.length) notes.push(`Defectos: ${defects.map((defect) => defectLabel(defect).toLowerCase()).join(", ")}.`);
   if (hasButterflyKeyboard(item)) notes.push("Teclado de mariposa: el mercado sigue descontando esa generación.");
   const support = supportLevel(item);
-  if (support === "none") notes.push("Sin macOS 27 ni Tahoe: se acabó el soporte grande de sistema.");
+  if (support === "none") notes.push("Sin macOS 27 ni Tahoe: ya no recibe sistema nuevo y eso pesa en el precio.");
   if (support === "security") notes.push("Se queda en macOS Tahoe, solo con actualizaciones de seguridad.");
-  return { factor, notes };
+  return { factor: Math.max(0.12, factor), notes };
 }
 
 function chipKey(chip: string | null): string {
@@ -288,11 +414,14 @@ function band(typical: number, spread: number): ChannelQuote {
   };
 }
 
-function launchAnchor(item: CatalogItem): { launch: number | null; snapshot: number | null } {
+function launchAnchor(item: CatalogItem): { launch: number | null; snapshot: number | null; sibling: CatalogItem | null } {
   if (item.priceBasis === "used-snapshot" && item.launchPriceEUR == null) {
-    return { launch: null, snapshot: item.basePriceEUR };
+    return { launch: null, snapshot: item.basePriceEUR, sibling: null };
   }
-  return { launch: item.launchPriceEUR ?? item.basePriceEUR, snapshot: null };
+  const launch = item.launchPriceEUR ?? item.basePriceEUR;
+  if (launch != null) return { launch, snapshot: null, sibling: null };
+  const guess = siblingLaunch(item);
+  return { launch: guess?.price ?? null, snapshot: null, sibling: guess?.sibling ?? null };
 }
 
 export function marketValue(
@@ -304,19 +433,21 @@ export function marketValue(
   extra: Observation[] = [],
 ): MarketValuation | null {
   const anchor = launchAnchor(item);
-  if (anchor.launch == null && anchor.snapshot == null) return null;
-
-  const age = Math.max(0, ageYears(item.year, item.month, asOf));
-  const retention = refurbishedRetention(item, age);
-  const spec = specFactor(item, ramGB, storage);
   const byId = new Map<string, Observation>();
   for (const observation of [...STORED, ...extra]) byId.set(observation.id, observation);
   const pool = [...byId.values()];
   const exact = pool.filter((observation) => exactMatch(item, ramGB, storage.gb, observation));
+  if (anchor.launch == null && anchor.snapshot == null && !exact.length) return null;
+
+  const age = Math.max(0, ageYears(item.year, item.month, asOf));
+  const retention = refurbishedRetention(item, age);
+  const spec = specFactor(item, ramGB, storage);
   const loose = pool.filter((observation) => !exact.includes(observation) && looseMatch(item, observation)).slice(0, 4);
 
   let refurbRaw: number;
-  if (anchor.launch != null) {
+  if (anchor.launch == null && anchor.snapshot == null) {
+    refurbRaw = median(exact.map((observation) => observation.priceEUR));
+  } else if (anchor.launch != null) {
     refurbRaw = anchor.launch * spec * retention;
   } else {
     const then = new Date(Date.UTC(2019, 5, 1));
@@ -324,6 +455,10 @@ export function marketValue(
     const retentionThen = refurbishedRetention(item, ageThen);
     refurbRaw = ((anchor.snapshot as number) / PRIVATE_OF_REFURB) * (retention / retentionThen) * spec;
   }
+
+  const successor = successorCap(item, ramGB, storage);
+  const capped = successor != null && successor.cap < refurbRaw;
+  if (successor && capped) refurbRaw = successor.cap;
 
   const appleNew = appleNewPrice(item, ramGB, storage);
   if (appleNew != null && age > 0.75) refurbRaw = Math.min(refurbRaw, appleNew);
@@ -344,7 +479,7 @@ export function marketValue(
   const buybackRaw = item.availability === "preorder" ? refurbTypical : privateRaw * BUYBACK_OF_PRIVATE;
 
   const confidence: MarketValuation["confidence"] =
-    exact.length >= 4 ? "alta" : exact.length >= 2 ? "media" : exact.length === 1 ? "baja" : age > 2.5 || supportLevel(item) !== "full" ? "modelo" : "baja";
+    exact.length >= 4 ? "alta" : exact.length >= 2 ? "media" : exact.length === 1 || anchor.sibling ? "baja" : age > 2.5 || supportLevel(item) !== "full" ? "modelo" : "baja";
 
   const refurbSpread = exact.length >= 2 ? 0.04 : confidence === "modelo" ? 0.16 : 0.1;
   const privateSpread = Math.max(refurbSpread, 0.12);
@@ -360,13 +495,20 @@ export function marketValue(
   if (item.availability === "preorder") {
     notesOut.unshift("Aún no hay mercado de segunda mano: el precio es el de lanzamiento.");
   } else if (!exact.length) {
-    notesOut.unshift("Sin un anuncio idéntico en el dataset. La cifra sale de la curva ajustada a los reacondicionados del 2 nov 2026.");
+    notesOut.unshift("Sin un anuncio idéntico en el reacondicionado oficial: la cifra sale de la curva de depreciación, así que tómala como orientación.");
   } else {
-    notesOut.unshift(`${exact.length} anuncios iguales en Apple Reacondicionado anclan el precio de compra certificada.`);
+    notesOut.unshift(`${exact.length} anuncios iguales en el reacondicionado oficial anclan el precio de compra certificada.`);
   }
-  notesOut.push("El acabado no cambia el precio: en el escaparate de Apple el mismo equipo vale igual en todos los colores.");
+  if (anchor.sibling && !exact.length) {
+    notesOut.splice(1, 0, `No hay PVP español contrastado de este modelo: se parte del de ${anchor.sibling.name} ${anchor.sibling.sizeLabel !== "—" ? anchor.sibling.sizeLabel + " " : ""}con ${anchor.sibling.chip} (${anchor.sibling.year}).`);
+  }
+  if (successor && capped) {
+    const name = `${successor.successor.name} con ${successor.successor.chip}`;
+    notesOut.splice(1, 0, `Hoy el ${name} nuevo sale a ${eur(successor.successor.launchPriceEUR ?? 0)}: con ${successor.generations} ${successor.generations === 1 ? "generación" : "generaciones"} de diferencia, este no se paga más que una parte de eso.`);
+  }
+
   if (!exact.length || extra.length === 0) {
-    notesOut.push("Vender a un particular y a una tienda parte del reacondicionado (un 16% y luego un 32% menos). No hay ventas cerradas de Wallapop ni de eBay en el dataset.");
+    notesOut.push("Los precios de venta salen del reacondicionado: a un particular, un 16 % menos; a una tienda, otro 32 % menos.");
   }
 
   const comparables: Comparable[] = [...exact, ...loose].slice(0, 6).map((observation) => ({
@@ -389,7 +531,7 @@ export function marketValue(
     comparables,
     method: exact.length
       ? "Curva ajustada al dataset y mezclada con anuncios de la misma configuración."
-      : `Curva de depreciación ajustada a Apple Reacondicionado España (${priceDataset.observedOn}), por soporte de macOS, segmento y ampliaciones.`,
+      : `Curva de depreciación ajustada al reacondicionado oficial en España (${priceDataset.observedOn}), por soporte de macOS, segmento y ampliaciones.`,
     recalibrated,
     ageYears: age,
     retention,
@@ -404,13 +546,15 @@ export function parseState(params: { get(name: string): string | null }): Machin
   const cycles = params.get("cyc");
   const defects = (params.get("def") ?? "")
     .split(",")
-    .filter((token): token is Defect => ["pantalla", "teclado", "liquido", "placa", "golpes"].includes(token));
+    .filter((token): token is Defect => DEFECTS.some((entry) => entry.id === token));
   return {
     grade: grades.includes(grade as Grade) ? (grade as Grade) : DEFAULT_STATE.grade,
-    batteryHealth: battery == null || battery === "" ? DEFAULT_STATE.batteryHealth : Number(battery),
+    batteryHealth: battery == null || battery === "" ? DEFAULT_STATE.batteryHealth : battery === "nd" ? null : Number(battery),
     cycleCount: cycles == null || cycles === "" ? null : Number(cycles),
     appleCareMonths: Number(params.get("care") ?? 0) || 0,
     boxAndCharger: params.get("box") !== "0",
+    charger: params.get("chg") !== "0",
+    invoice: params.get("fac") !== "0",
     keyboard: params.get("kb") === "ot" ? "other" : params.get("kb") === "na" ? "na" : "es",
     nanoTexture: params.get("nano") === "1",
     defects,
@@ -420,10 +564,12 @@ export function parseState(params: { get(name: string): string | null }): Machin
 export function stateQuery(state: MachineState): string {
   const params = new URLSearchParams();
   params.set("g", state.grade);
-  if (state.batteryHealth != null) params.set("bat", String(state.batteryHealth));
+  params.set("bat", state.batteryHealth == null ? "nd" : String(state.batteryHealth));
   if (state.cycleCount != null) params.set("cyc", String(state.cycleCount));
   if (state.appleCareMonths) params.set("care", String(state.appleCareMonths));
   params.set("box", state.boxAndCharger ? "1" : "0");
+  params.set("chg", state.charger ? "1" : "0");
+  params.set("fac", state.invoice ? "1" : "0");
   params.set("kb", state.keyboard === "other" ? "ot" : state.keyboard === "na" ? "na" : "es");
   if (state.nanoTexture) params.set("nano", "1");
   if (state.defects.length) params.set("def", state.defects.join(","));

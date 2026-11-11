@@ -1,6 +1,6 @@
 import { chipRank } from "./depreciation";
 import { eur, modelTitle, ramLabel, storageLabel } from "./format";
-import { DEFAULT_STATE, marketValue, supportLevel } from "./market";
+import { DEFAULT_STATE, marketValue, priceDataset, supportLevel } from "./market";
 import type { CatalogItem, RecommendAnswers, StorageOption } from "./types";
 
 export type SuggestionRole = "encaja" | "ahorro" | "superior";
@@ -12,7 +12,8 @@ export type Suggestion = {
   ramGB: number;
   storageIndex: number;
   priceEUR: number;
-  priceKind: "nuevo" | "reacondicionado";
+  /** "segunda-mano": estimado entre particulares, cuando Apple no tiene ese modelo reacondicionado. */
+  priceKind: "nuevo" | "reacondicionado" | "segunda-mano";
   priceSource: string;
   priceDate: string;
   configLabel: string;
@@ -28,6 +29,9 @@ export type Recommendation = {
   minimumEUR: number | null;
   relaxed: string | null;
 };
+
+const BIG_CHIP = /\bM\d+\s*(max|ultra)\b/i;
+const PRO_CHIP = /\bM\d+\s*(pro|max|ultra)\b/i;
 
 const AS_OF = () => new Date();
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -85,9 +89,13 @@ function eligible(item: CatalogItem, answers: RecommendAnswers): boolean {
     if (answers.desktopUse === "aio" && item.family !== "imac") return false;
     if (answers.desktopUse === "external" && item.family === "imac") return false;
   }
+  if (answers.profile === "personal" && BIG_CHIP.test(item.chip)) return false;
+  if (answers.profile === "pro" && item.family === "macbook-neo") return false;
+  if (answers.profile === "extreme" && !PRO_CHIP.test(item.chip)) return false;
   if (answers.formFactor === "portable" && answers.mobility === "light") {
-    if (item.weight === "heavy" || item.family === "macbook-pro") return false;
+    if (item.weight === "heavy" || item.screenInches >= 15) return false;
   }
+  if (answers.formFactor === "portable" && answers.manyPorts === "yes" && item.family === "macbook-neo") return false;
   if (answers.formFactor === "portable" && answers.mobility === "power") {
     if (item.family === "macbook-neo" || item.family === "macbook-air") return false;
   }
@@ -101,14 +109,16 @@ function fitness(item: CatalogItem, answers: RecommendAnswers, ramGB: number, st
   if (item.availability === "current" || item.availability === "preorder") score += 4;
   if (answers.mobility === "light" && item.weight === "light") score += 12;
   if (answers.mobility === "power" && item.family === "macbook-pro") score += 8;
-  if (answers.profile === "pro" && ["macbook-pro", "mac-studio", "mac-pro", "imac"].includes(item.family)) score += 10;
+  if (answers.profile !== "personal" && ["macbook-pro", "mac-studio", "mac-pro", "imac"].includes(item.family)) score += 10;
+  if (answers.profile === "extreme" && ["macbook-pro", "mac-studio"].includes(item.family)) score += 6;
   if (answers.profile === "personal" && ["macbook-air", "macbook-neo", "imac", "mac-mini"].includes(item.family)) score += 6;
-  if (answers.manyPorts === "yes" && item.ports === "many") score += 4;
+  // HDMI y lector SD sin adaptadores solo los trae el MacBook Pro desde 2021.
+  if (answers.manyPorts === "yes" && item.formFactor === "portable" && item.family === "macbook-pro") score += 25;
+  else if (answers.manyPorts === "yes" && item.ports === "many") score += 4;
   if (answers.uhd === "yes" && (item.builtInUhd || item.drivesUhd)) score += 2;
-  if (answers.profile === "pro" && item.screenInches >= 16) score += 6;
-  else if (answers.profile === "pro" && item.screenInches >= 15) score += 2;
-  const heavyChip = /max|ultra/i.test(item.chip);
-  if (heavyChip) score += answers.profile === "pro" ? 4 : -8;
+  if (answers.profile !== "personal" && answers.bigScreen !== "no" && item.screenInches >= 16) score += 6;
+  else if (answers.profile !== "personal" && answers.bigScreen !== "no" && item.screenInches >= 15) score += 2;
+  if (BIG_CHIP.test(item.chip)) score += answers.profile === "extreme" ? 10 : answers.profile === "pro" ? 0 : -8;
   return score;
 }
 
@@ -156,7 +166,34 @@ function refurbOffer(items: CatalogItem[], answers: RecommendAnswers, asOf: Date
       }
     });
   }
-  return best;
+  return best ?? privateOffer(items, answers, asOf);
+}
+
+/**
+ * Sin stock en Apple Reacondicionado, el usado real en España está en Wallapop y
+ * Milanuncios. Se estima lo que pide un particular por uno en muy buen estado, con la
+ * misma curva que la tasación. Solo modelos descatalogados: los actuales aún no tienen
+ * un mercado de segunda mano con precio estable.
+ */
+function privateOffer(items: CatalogItem[], answers: RecommendAnswers, asOf: Date): Offer | null {
+  const item = [...items]
+    .filter((entry) => entry.availability === "discontinued")
+    .sort((a, b) => (a.launchPriceEUR ?? Infinity) - (b.launchPriceEUR ?? Infinity))[0];
+  const storage = item?.storageOptions[0];
+  if (!item || !storage?.gb) return null;
+  const quote = marketValue(item, item.ramGB, storage, DEFAULT_STATE, asOf);
+  if (!quote) return null;
+  return {
+    item,
+    ramGB: item.ramGB,
+    storage,
+    storageIndex: 0,
+    priceEUR: Math.round(quote.privateSell.typical / 10) * 10,
+    priceKind: "segunda-mano",
+    priceSource: "Estimación entre particulares (Wallapop, Milanuncios), en muy buen estado",
+    priceDate: shortDate(priceDataset.observedOn),
+    score: fitness(item, answers, item.ramGB, storage.gb),
+  };
 }
 
 function offersFor(items: CatalogItem[], answers: RecommendAnswers, asOf: Date): Offer[] {
@@ -173,7 +210,9 @@ function offersFor(items: CatalogItem[], answers: RecommendAnswers, asOf: Date):
     if (fresh) offers.push(fresh);
     if (used) offers.push(used);
   }
-  return offers.sort((a, b) => b.score - a.score || a.priceEUR - b.priceEUR);
+  // Para trabajo exigente, 8 GB no es una recomendación seria.
+  const minRam = answers.profile === "personal" ? 0 : 16;
+  return offers.filter((offer) => offer.ramGB >= minRam).sort((a, b) => b.score - a.score || a.priceEUR - b.priceEUR);
 }
 
 export function relevantDifference(a: CatalogItem, b: CatalogItem): boolean {
@@ -216,12 +255,13 @@ function contrast(offer: Offer, fit: Offer): string {
   const offerDisk = offer.storage.gb ?? 0;
   const fitDisk = fit.storage.gb ?? 0;
   if (offerDisk && fitDisk && offerDisk !== fitDisk) bits.push(`disco de ${storageLabel(offer.storage.gb, offer.storage.label)} en vez de ${storageLabel(fit.storage.gb, fit.storage.label)}`);
+  if (offer.item.family === "macbook-pro" && fit.item.family !== "macbook-pro" && offer.item.formFactor === "portable") bits.push("HDMI, lector SD y ventilador para cargas largas");
   if (!bits.length) return "más margen para el trabajo";
   return bits.slice(0, 3).join(", ");
 }
 
 function usageClause(answers: RecommendAnswers): string {
-  if (answers.profile === "pro" && answers.mobility === "power") return "Para editar vídeo y proyectos grandes";
+  if (answers.profile === "extreme") return "Para vídeo pesado, 3D o IA en local";
   if (answers.profile === "pro") return "Para trabajo exigente";
   if (answers.mobility === "light") return "Para llevarlo encima";
   if (answers.formFactor === "desktop" && answers.desktopUse === "aio") return "Para dejarlo en la mesa, con pantalla incluida";
@@ -236,22 +276,20 @@ function toSuggestion(role: SuggestionRole, offer: Offer, fit: Offer, answers: R
   const gap = Math.abs(offer.priceEUR - fit.priceEUR);
   let roleTitle = "La que encaja";
   let why = `${usageClause(answers)}, ${name} (${cfg}) es la más capaz que cabe en ${eur(answers.budget)}.`;
-  let tradeoff = offer.item.family === "macbook-neo"
-    ? "8 GB y 256 GB van justos en cuanto acumulas pestañas y archivos. El salto que compensa es un Air con M5, y sale más caro."
-    : answers.profile === "pro"
-      ? "Es el equipo de trabajo: pesa más que un Air y el presupuesto se queda ahí."
-      : "Para oficina y clase va sobrado. Para vídeo largo o 3D, un Pro se nota.";
+  let tradeoff = familyTradeoff(offer, answers);
   if (role === "encaja" && over > 0) {
-    why = `${usageClause(answers)}, ${name} (${cfg}) se pasa ${eur(over)}. Por ese margen no compensa bajar a un modelo peor que cuesta casi lo mismo.`;
+    why = `${usageClause(answers)}, ${name} (${cfg}) se pasa ${eur(over)} de tu presupuesto, pero por ese margen es la que más te da.`;
     tradeoff = `Son ${eur(over)} más de lo que marcaste.`;
   }
   if (role === "ahorro") {
     roleTitle = "Ahorro de verdad";
-    const channel = offer.priceKind === "reacondicionado" ? "reacondicionado de Apple" : "nuevo, un escalón por debajo";
+    const channel = offer.priceKind === "reacondicionado" ? "reacondicionado por Apple" : offer.priceKind === "segunda-mano" ? "de segunda mano entre particulares" : "nuevo, un escalón por debajo";
     why = `${name} (${cfg}), ${channel}, son ${eur(gap)} menos que ${modelTitle(fit.item)} con ${fit.item.chip}.`;
     tradeoff = offer.priceKind === "reacondicionado"
-      ? `No es a estrenar. ${offer.item.chip} y ${ramLabel(offer.ramGB)}, frente a ${fit.item.chip} y ${ramLabel(fit.ramGB)}.`
-      : `Bajas de verdad: ${contrast(offer, fit)}.`;
+      ? `No es a estrenar, pero Apple lo certifica con batería y carcasa nuevas y un año de garantía. ${offer.item.chip} y ${ramLabel(offer.ramGB)}, frente a ${fit.item.chip} y ${ramLabel(fit.ramGB)}.`
+      : offer.priceKind === "segunda-mano"
+        ? `Precio estimado y sin garantía de Apple: antes de pagar, mira la salud de la batería y que no tenga bloqueo de iCloud. ${offer.item.chip} y ${ramLabel(offer.ramGB)}, frente a ${fit.item.chip} y ${ramLabel(fit.ramGB)}.`
+        : `Bajas de verdad: ${contrast(offer, fit)}.`;
   }
   if (role === "superior") {
     roleTitle = "Un paso más";
@@ -280,14 +318,31 @@ function toSuggestion(role: SuggestionRole, offer: Offer, fit: Offer, answers: R
   };
 }
 
+function familyTradeoff(offer: Offer, answers: RecommendAnswers): string {
+  const { item } = offer;
+  let text: string;
+  if (item.family === "macbook-neo") text = "8 GB y 256 GB van justos en cuanto acumulas pestañas y archivos. El salto que compensa es un Air, y sale más caro.";
+  else if (item.family === "macbook-air") text = answers.profile === "personal" ? "Sin ventilador: para clase, oficina y fotos va sobrado; en exportaciones de vídeo largas baja el ritmo." : "Sin ventilador: en sesiones largas de vídeo o compilación baja el ritmo frente a un Pro.";
+  else if (item.family === "macbook-pro") text = "Pesa y cuesta más que un Air; a cambio, mejor pantalla, HDMI, lector SD y rendimiento sostenido.";
+  else if (item.family === "imac") text = "No se amplía después: elige bien la memoria y el disco al comprarlo.";
+  else if (item.family === "mac-mini") text = "Monitor, teclado y ratón van aparte: súmalos al presupuesto.";
+  else if (item.family === "mac-studio") text = "Pensado para cargas muy pesadas. Monitor, teclado y ratón van aparte.";
+  else text = "Equipo de trabajo: el presupuesto se queda ahí.";
+  if (offer.ramGB <= 8 && item.family !== "macbook-neo") text += " Con 8 GB va justo para muchas pestañas o fotos pesadas.";
+  if (answers.manyPorts === "yes" && item.formFactor === "portable" && item.family !== "macbook-pro") text += " Para HDMI o tarjetas SD necesitarás un adaptador USB-C.";
+  return text;
+}
+
 function best(rows: Offer[]): Offer | null {
   return [...rows].sort((a, b) => b.score - a.score || a.priceEUR - b.priceEUR)[0] ?? null;
 }
 
 export function recommend(items: CatalogItem[], answers: RecommendAnswers, asOf = AS_OF()): Recommendation {
   const pool = offersFor(items, answers, asOf);
-  const channel = answers.condition === "new" ? pool.filter((offer) => offer.priceKind === "nuevo") : pool.filter((offer) => offer.priceKind === "reacondicionado");
-  const note = answers.usbC === "no" ? "Los Mac con macOS 27 salen con USB-C. No te propongo uno antiguo solo por los enchufes de siempre." : null;
+  const channel = answers.condition === "any" ? pool : answers.condition === "new" ? pool.filter((offer) => offer.priceKind === "nuevo") : pool.filter((offer) => offer.priceKind !== "nuevo");
+  // A quien quiere nuevo no se le propone un usado sin garantía como alternativa.
+  const alternatives = answers.condition === "new" ? pool.filter((offer) => offer.priceKind !== "segunda-mano") : pool;
+  const note = null;
 
   if (!channel.length) {
     const prices = pool.map((offer) => offer.priceEUR);
@@ -302,9 +357,9 @@ export function recommend(items: CatalogItem[], answers: RecommendAnswers, asOf 
   }
 
   const savings = best(
-    pool.filter((offer) => offer.item.id !== fit.item.id && offer.priceEUR <= fit.priceEUR * 0.85 && offer.priceEUR <= answers.budget && offerDifference(offer, fit) && !isDominated(offer, fit)),
+    alternatives.filter((offer) => offer.item.id !== fit.item.id && offer.priceEUR <= fit.priceEUR * 0.85 && offer.priceEUR <= answers.budget && offerDifference(offer, fit) && !isDominated(offer, fit)),
   );
-  const superior = [...pool]
+  const superior = [...alternatives]
     .filter((offer) => offer.item.id !== fit.item.id && offer.priceEUR >= fit.priceEUR * 1.12 && offer.priceEUR <= answers.budget * 1.45 && offer.score > fit.score && offerDifference(offer, fit) && !isDominated(fit, offer))
     .sort((a, b) => a.priceEUR - b.priceEUR)[0] ?? null;
 

@@ -108,8 +108,8 @@ test("un barrido no junta precios, no saca Intel y no deja un modelo dominado", 
   const budgets = [700, 900, 1200, 1800, 2500, 4000];
   const mobilities = ["light", "power", "unsure"] as const;
   const screens = ["yes", "no", "unsure"] as const;
-  const conditions = ["new", "used"] as const;
-  const profiles = ["personal", "pro"] as const;
+  const conditions = ["new", "used", "any"] as const;
+  const profiles = ["personal", "pro", "extreme"] as const;
   for (const budget of budgets) {
     for (const mobility of mobilities) {
       for (const bigScreen of screens) {
@@ -147,4 +147,31 @@ test("un modelo peor y no más barato se descarta", () => {
   assert.equal(isDominated({ item: neo, priceEUR: 800, ramGB: 8 }, { item: air, priceEUR: 790, ramGB: 16 }), true);
   const kept = dropCloseOrDominated([fake(neo, 800, 30, "ahorro"), fake(air, 790, 50, "encaja")]);
   assert.deepEqual(kept.map((suggestion) => suggestion.item.id), ["mba-13-m5-2026"]);
+});
+
+test("de segunda mano con poco presupuesto también propone algo, y a un profesional no le da 8 GB", () => {
+  const cheap = recommend(catalog, answers({ condition: "used", budget: 500 }), AS_OF);
+  assertHealthy(cheap.suggestions);
+  assert.ok(cheap.suggestions.length >= 1);
+  assert.ok(cheap.suggestions.every((suggestion) => suggestion.priceEUR <= 500 * 1.08));
+  assert.ok(cheap.suggestions.some((suggestion) => suggestion.priceKind === "segunda-mano"));
+
+  const fresh = recommend(catalog, answers({ condition: "new", budget: 1200 }), AS_OF);
+  assert.ok(fresh.suggestions.every((suggestion) => suggestion.priceKind !== "segunda-mano"));
+
+  for (const profile of ["pro", "extreme"] as const) {
+    for (const condition of ["new", "used", "any"] as const) {
+      const result = recommend(catalog, answers({ profile, condition, budget: 2000 }), AS_OF);
+      assertHealthy(result.suggestions);
+      assert.ok(result.suggestions.every((suggestion) => suggestion.ramGB >= 16), `${profile} ${condition}`);
+      assert.ok(result.suggestions.every((suggestion) => suggestion.item.family !== "macbook-neo"));
+    }
+  }
+  const heavy = recommend(catalog, answers({ profile: "extreme", budget: 3000 }), AS_OF);
+  assert.ok(heavy.suggestions.every((suggestion) => /M\d+ (Pro|Max|Ultra)/.test(suggestion.item.chip)));
+});
+
+test("con HDMI y SD, un MacBook Pro gana si cabe en el presupuesto", () => {
+  const result = recommend(catalog, answers({ profile: "pro", manyPorts: "yes", budget: 2000 }), AS_OF);
+  assert.equal(result.suggestions[0]?.item.family, "macbook-pro");
 });

@@ -54,9 +54,9 @@ export const FAMILY_ICON: Record<CatalogItem["family"], string> = {
   "macbook-pro": "/hello/macbook-pro.png",
   macbook: "/hello/macbook.png",
   "macbook-neo": "/hello/macbook.png",
-  "mac-mini": "/hello/mac-mini.png",
+  "mac-mini": "/icons/macs/mac-mini.svg",
   imac: "/hello/imac.png",
-  "mac-studio": "/hello/mac-mini.png",
+  "mac-studio": "/icons/macs/mac-studio.svg",
   "mac-pro": "/hello/mac-pro.png",
 };
 

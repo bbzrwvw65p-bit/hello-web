@@ -96,7 +96,9 @@ export type RecommendAnswers = {
   uhd: "yes" | "no" | "unsure";
   manyPorts: "yes" | "no";
   usbC: "yes" | "no" | "unsure";
-  condition: "new" | "used";
-  profile: "personal" | "pro";
+  /** "any": nuevo o reacondicionado, lo que salga mejor. */
+  condition: "new" | "used" | "any";
+  /** "extreme": vídeo 4K/8K a diario, 3D, IA en local. */
+  profile: "personal" | "pro" | "extreme";
   budget: number;
 };

@@ -1,6 +1,6 @@
-const CACHE = "hello-shell-v2";
+const CACHE = "hello-shell-v3";
 const BASE = "";
-const SHELL = ["/","/valorar/","/recomendar/","/catalogo/","/acerca/"];
+const SHELL = ["/","/recomendar/","/valorar/","/mi-mac/","/comparar/","/catalogo/","/modelo/","/checklist/","/acerca/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

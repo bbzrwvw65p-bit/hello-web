@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const shell = ["/", "/valorar/", "/recomendar/", "/catalogo/", "/acerca/"].map((path) => `${base}${path}`);
+const shell = ["/", "/recomendar/", "/valorar/", "/mi-mac/", "/comparar/", "/catalogo/", "/modelo/", "/checklist/", "/acerca/"].map((path) => `${base}${path}`);
 
-const source = `const CACHE = "hello-shell-v2";
+const source = `const CACHE = "hello-shell-v3";
 const BASE = ${JSON.stringify(base)};
 const SHELL = ${JSON.stringify(shell)};
 

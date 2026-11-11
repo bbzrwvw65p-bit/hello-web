@@ -54,7 +54,11 @@ La memoria y el disco no suman lo que Apple cobró por ampliar. En el mismo esca
 
 El soporte de macOS entra aparte. En noviembre de 2026, macOS 27 Golden Gate ya no admite ningún Intel. Los cuatro que se quedan en Tahoe (MacBook Pro 16″ de 2019, MacBook Pro 13″ de 2020 con cuatro puertos, iMac 27″ de 2020 y Mac Pro de 2019) solo tienen seguridad y se descuentan. El resto de Intel, más. El teclado de mariposa (MacBook 2015-2017, Air 2018-2019, Pro 13″ y 15″ de 2016-2019) resta otro 12 %. El de 16″ de 2019 no: ya era de tijera.
 
-Cada tasación pide la configuración exacta y el estado: como nuevo, muy bueno, bueno o aceptable; salud y ciclos de batería; AppleCare que quede; caja y cargador; teclado español u otro; vidrio nanotexturizado si el modelo lo tenía; y defectos (pantalla, teclado, líquidos, placa, golpes). El acabado se puede ignorar.
+Desde la v2, para los Mac con chip de Apple descatalogados hay además un **techo por sucesor**: no valen más que una parte del modelo actual de la misma línea (88 % con una generación de diferencia, 80 % con dos, 74 % con tres, 66 % con cuatro…), ajustada por memoria y disco. Sin él, un Air M2 (1.519 € de salida) salía más caro que un Air M5 nuevo. Si un modelo no tiene PVP español contrastado, se usa el anuncio igual de Apple Reacondicionado o, si no hay, el PVP más bajo de un hermano de la misma línea a tres años o menos, con confianza baja. El chip solo cuenta como Apple silicon si el Mac es de 2020 o posterior: en los CSV, el Core m3/m5/m7 y algunos Intel de 2015 traían «M3» o «m5» en ese campo.
+
+Cada tasación pide la configuración exacta y el estado: aspecto (como nuevo, muy bueno, bueno o aceptable, con una frase que lo explica); salud de la batería o «no lo sé» y ciclos; garantía o AppleCare+ que quede; cargador (o teclado y ratón en un iMac), caja y factura por separado; teclado español u otro; vidrio nanotexturizado si el modelo lo tenía; y defectos (golpes, marcas o rotura de pantalla, teclado, puertos, líquidos, placa y bloqueo de iCloud o MDM). El acabado se puede ignorar. Desde la ficha se puede volver a cambiar el estado sin repetir el modelo.
+
+El recomendador pregunta: portátil o escritorio; con o sin monitor (escritorio); uso (día a día, exigente, muy exigente); tamaño (portátil); si necesita HDMI o SD (portátil); nuevo, reacondicionado o me da igual; y presupuesto. Si Apple no tiene un modelo reacondicionado, propone el usado entre particulares con precio estimado y lo marca así.
 
 Tres precios, cada uno con suelo, típico y techo:
 
