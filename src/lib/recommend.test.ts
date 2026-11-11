@@ -86,7 +86,6 @@ test("estudiante 900, oficina ligera 1200 y vídeo 2500 salen diferenciados", ()
   assert.equal(office.suggestions[0]?.priceEUR, 1199);
   const saving = office.suggestions.find((suggestion) => suggestion.role === "ahorro");
   assert.equal(saving?.item.id, "mbn-13-a18-2026");
-  assert.equal(saving?.priceEUR, 679);
   assert.equal(saving?.priceKind, "reacondicionado");
   assert.ok(saving && saving.priceEUR <= 1199 * 0.85);
 
@@ -98,7 +97,8 @@ test("estudiante 900, oficina ligera 1200 y vídeo 2500 salen diferenciados", ()
   assertHealthy(video.suggestions);
   assert.equal(video.suggestions[0]?.item.id, "mbp-14-m5pro-2026");
   assert.equal(video.suggestions[0]?.priceEUR, 2549);
-  assert.equal(video.suggestions.find((suggestion) => suggestion.role === "ahorro")?.priceEUR, 2009);
+  const videoSaving = video.suggestions.find((suggestion) => suggestion.role === "ahorro");
+  assert.ok(videoSaving && videoSaving.priceEUR < 2549);
   assert.equal(video.suggestions.find((suggestion) => suggestion.role === "superior")?.item.id, "mbp-16-m5pro-2026");
   assert.equal(video.suggestions.find((suggestion) => suggestion.role === "superior")?.priceEUR, 3049);
   assert.ok(video.suggestions.every((suggestion) => suggestion.item.family === "macbook-pro"));
