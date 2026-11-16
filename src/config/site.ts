@@ -15,4 +15,4 @@
  */
 export const PAYPAL_URL = "";
 
-export const CUSTOM_DOMAIN = "";
+export const CUSTOM_DOMAIN = "hello.thedotapps.com";
